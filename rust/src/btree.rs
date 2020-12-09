@@ -58,15 +58,21 @@ impl<'a> BSTree<'a> {
     }
 
     pub fn insert(&mut self, val: &'a usize) {
+        // Credit to this article for helping me break through lifetimes confusion
+        // https://gist.github.com/aidanhs/5ac9088ca0f6bdd4a370
         if val < self.value {
-            match self.left {
-                None => self.left = Some(Box::new(BSTree::new(val))),
-                Some(node) => self.left.unwrap().insert(val),
+            // We match on the mutable value `self.left`
+            match &mut self.left {
+                // Each pattern must also include `&mut`, so we can modify the node.
+                &mut None => *(&mut self.left) = Some(Box::new(BSTree::new(val))),
+                // We match on Some(ref ...) so we don't move into the node,
+                // just use a refernece to the node.
+                &mut Some(ref mut node) => node.insert(val),
             }
         } else if val >= self.value {
-            match self.right {
-                None => self.right = Some(Box::new(BSTree::new(val))),
-                Some(node) => self.right.unwrap().insert(val),
+            match &mut self.right {
+                &mut None => *(&mut self.right) = Some(Box::new(BSTree::new(val))),
+                &mut Some(ref mut node) => node.insert(val),
             }
         }
     }
