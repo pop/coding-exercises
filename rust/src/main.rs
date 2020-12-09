@@ -1,5 +1,6 @@
 use clap::{crate_version, Clap};
 
+mod btree;
 mod hanoi;
 
 #[derive(Clap)]
@@ -13,6 +14,8 @@ struct Opts {
 enum SubCommand {
     #[clap(version = "0.1", about = "Towers of Hanoi")]
     Hanoi,
+    #[clap(version = "0.1", about = "Binary Tree")]
+    BTree,
 }
 
 fn main() {
@@ -21,6 +24,9 @@ fn main() {
     match opts.exercise {
         SubCommand::Hanoi => {
             hanoi::run();
+        }
+        SubCommand::BTree => {
+            btree::run();
         }
     }
 }
