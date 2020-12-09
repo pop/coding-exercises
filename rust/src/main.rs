@@ -1,6 +1,6 @@
 use clap::{crate_version, Clap};
 
-mod btree;
+mod bstree;
 mod hanoi;
 
 #[derive(Clap)]
@@ -26,7 +26,7 @@ fn main() {
             hanoi::run();
         }
         SubCommand::BTree => {
-            btree::run();
+            bstree::run();
         }
     }
 }
