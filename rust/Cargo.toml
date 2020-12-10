@@ -1,14 +1,11 @@
 [package]
-name = "rust-exercises"
+name = "exercises"
 version = "0.1.0"
 authors = ["Elijah Voigt <elijah.caine.mv@gmail.com>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [lib]
-name = "bstree"
-path = "src/bstree.rs"
+bench = false
 
 [dependencies]
-clap = "3.0.0-beta.2"
+text_io = "0.1.8"
