@@ -1,3 +1,5 @@
+![Rust](https://github.com/pop/coding-exercises/workflows/Rust/badge.svg?branch=main)
+
 # Coding Exercises
 
 Coding exercises to get gooder at algorithms and computers
