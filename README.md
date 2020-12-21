@@ -8,8 +8,11 @@ Coding exercises to get gooder at algorithms and computers
 
 At the top level we have different languages.
 
-Within each language we have a folder for each exercise.
-Usually an implementation of an algorithm or solution to a puzzle.
+Within each language we have a library consisting of different puzzle/algorithm implementations.
+
+I have tried to make each language idiomatic in it's structure and interface.
+
+Sometimes there is an interactive component, but usually you'll need to read the tests/benchmarks/examples.
 
 ## Other stuff
 
