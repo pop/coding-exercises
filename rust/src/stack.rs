@@ -1,12 +1,11 @@
 /// Stacks
 ///
 /// Our goals with this exercise are...
-/// * Implement three stacks with one vec.
-/// * Design a stack which has Push, Pop, and Min, all of which operate in O(1).
+/// * Implement three stacks with one vec. [TriStack]
+/// * Design a stack which has Push, Pop, and Min, all of which operate in O(1). [ConstStack]
 /// * Implement a Queue using two Stacks.
 /// * Sort a stack using at most one additional stack.
 ///
-
 
 ///
 /// TriStack
@@ -55,6 +54,10 @@
 /// clean, it does hint at the implementation, is scalable to more than three stacks and requires
 /// me to implement logic that I'd probably need anyway. So it's not the _best_ API, but it is sort
 /// of a min-max between clean API and clean implementation.
+///
+/// NOTE: I start with an API discussion to nail down our interface so I can write tests
+/// immediately. Once the API is stable-ish we can write tests and start our Test driven
+/// development implementation.
 ///
 /// Implementation Discussion:
 ///
@@ -126,11 +129,10 @@ impl TriStack {
             self.vec.push(None);
         }
 
-        self.vec[index] = Some(val)
+        self.vec[index] = Some(val);
     }
 
     pub fn pop(&mut self, stack: StackChoice) -> Option<usize> {
-        // TODO: I see a lot of duplicated code. Move out to method.
         let (index, element): (Option<usize>, &Option<usize>) = match self.find_top_element(stack) {
             Some((pos, element)) => (Some(pos), element),
             None => (None, &None)
@@ -238,3 +240,187 @@ fn test_find_top_element() {
     assert_eq!(top_2, Some((1, &Some(2))));
     assert_eq!(top_3, Some((2, &Some(3))));
 }
+
+///
+/// ConstStack
+///
+/// > Implement a stack with push, pop, and min, all of which operate in O(1).
+///
+/// Note that I was tempted to implement this with slices and arrays instead of Vecs.
+/// I was hoping to do that to (A) limit the helper methods I could use and (B) hopefully get some
+/// memory gains.
+/// This ended up being trickey and I gave up on it because of either ownership problems, which are
+/// manageable, and growing memory ownership problems, which I'm still not comfortable with. Plus
+/// by the time I got something working I lost all of the memory benefits of Vec (I assume) are in
+/// the stdlib.
+///
+/// Here's the problem with usin slices instead of vecs.
+///
+/// Let's say we're in `push` and we want to add an element to our stack:
+///
+/// ```compile_fail
+/// pub fn push(&mut self, val: usize) {
+///     self.list = ...? // What goes here?
+/// }
+/// ```
+///
+/// You might think we can concat our current slice with a new slice of just our val.
+/// That looks like this and it suffers from temporary ownership -- the memory allocated for the
+/// new `self.list` is restricted to the local scope so it can't be assigned to `self.list`.
+///
+/// ```compile_fail
+/// pub fn push(&mut self, val: usize) {
+///     let new: [usize; 1] = [val]; // freed after function scope
+///     self.list = &[self.list, new[..]].concat();
+/// }
+/// ```
+///
+/// Great you're thinking. If scope is your issue, just use a `Box`.
+/// Ah, but a Box needs to know the size of it's arguments and a slice by definition does not know
+/// it's size at compile time.
+///
+/// ```compile_fail
+/// pub fn push(&mut self, val: usize) {
+///     let new_val: [usize; 1] = [val]; // "all function arguments must have a statically known size"
+///     let new_list = [self.list, Box::new(new_val[..])].concat();
+/// }
+/// ```
+///
+/// No matter how hard we try here, (A) Box requires static sized inputs and (B) we cannot
+/// pass pointers to the Box because any memory we allocate in `push` is freed, therefore we
+/// cannot use Box<Slice> nor Box<&Slice> for this solution.
+///
+/// Which leaves us with a few other options.
+/// We can either use a Vec, which is definitly the easy way out (it even has `push` and `pop`
+/// built in) or we can use some other structure like a linked list.
+///
+/// To make this exercise challenging we're doing our own bookkeeping for `min` value and `top`
+/// value (indexes in the array) so we can do things in constant time.
+///
+/// Now we could make this whole structure a linked list where we have a structure that stores it's
+/// value, it's min, and it's next value in a Option<Box>.
+///
+/// Push and Pop are as trivial as working on a linked list, easier even because we're just working
+/// on the tail of the list.
+///
+/// The downside is of course that we are working heavily on the heap which has poorer performance
+/// compared with the stack, but I'm sure L1-L3 cache will be enough to compensate for that...
+/// maybe... (TODO: Benchmarking).
+///
+/// So I ended up going with a linked-list approach to this problem.
+/// This ends up being similar to [A Bad
+/// Stack](https://rust-unofficial.github.io/too-many-lists/first.html) from "Learn Rust With
+/// Entirely Too Many Linked Lists" -- which I only realized after getting half way through my
+/// implementation... 😅
+///
+#[derive(Debug, Clone)]
+pub struct ConstStack {
+    val: Option<usize>,     // Value at top of stack
+    min: Option<usize>,     // Minimum value of stack
+    next: Option<Box<ConstStack>>, // Next value in stack
+}
+
+impl<'a> ConstStack {
+    pub fn new() -> ConstStack {
+        ConstStack {
+            val: None,
+            min: None,
+            next: None,
+        }
+    }
+
+    ///
+    /// Push a new value onto the stack.
+    ///
+    /// We use a linked-list so this involves updating the "top" node and pushing current values to
+    /// the 'next' node.
+    ///
+    pub fn push(&mut self, val: usize) {
+        // Create copy of self and push that under self into linked list
+        // We do this before modifying the head of the stack becuase we are about to over-write our
+        // self.* values.
+        self.next = match self.val {
+            Some(_) => {
+                let mut push = ConstStack::new();
+                push.val = self.val;
+                push.min = self.min;
+                push.next = self.next.take();
+                Some(Box::from(push))
+            },
+            None => None
+        };
+
+        // Update self values to reflet the new stack state
+        self.min = match self.min {
+            Some(cur) if cur > val => Some(val),
+            None                   => Some(val),
+            _                      => self.min ,
+        };
+
+        self.val = Some(val);
+   }
+
+    pub fn pop(&mut self) -> Option<usize> {
+        let val = self.val;
+
+        match &mut self.next {
+            Some(pull) => {
+                self.val = pull.val;
+                self.min = pull.min;
+                self.next = pull.next.take();
+            },
+            None => {
+                self.val = None;
+                self.min = None;
+                self.next = None;
+            },
+        }
+
+        val
+    }
+
+    pub fn min(&self) -> Option<usize> {
+        self.min
+    }
+}
+
+#[test]
+fn test_const_stack() {
+    // TODO: Need benchmarks to verify O(1) complexity
+    let mut o1 = ConstStack::new();
+    o1.push(2);
+    o1.push(1);
+    o1.push(3);
+
+    assert_eq!(o1.min(), Some(1));
+
+    assert_eq!(o1.pop(), Some(3));
+
+    assert_eq!(o1.pop(), Some(1));
+
+    assert_eq!(o1.min(), Some(2));
+
+    assert_eq!(o1.pop(), Some(2));
+
+    assert_eq!(o1.pop(), None);
+
+    assert_eq!(o1.min(), None);
+
+    o1.push(100);
+
+    assert_eq!(o1.min(), Some(100));
+
+    o1.push(50);
+    o1.push(101);
+    o1.push(102);
+    o1.push(103);
+
+    assert_eq!(o1.min(), Some(50));
+}
+
+/// 
+/// TwoStackQueue
+///
+/// > Implement a Queue using two Stacks.
+///
+pub struct TwoStackQueue { }
