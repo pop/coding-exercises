@@ -490,6 +490,13 @@ fn test_const_stack() {
 /// }
 /// ```
 ///
+/// Note that this is computationally complex. We are pushing and popping a _lot_ and for large
+/// stacks this can become a burden. The question didn't ask for an _efficient_ algorithm, it asked
+/// for an algorithm. The complexity of this implementation's `pop` is roughly O(n) where `n` is
+/// the size of the queue, and `push` is O(1) or constant time. Technically `push` is O(2n), but we
+/// collapse the 2 because we don't care about constant multipliers just weather this is linear,
+/// sub-linear, or exponential.
+///
 pub struct TwoStackQueue {
     a: Vec<usize>,
     b: Vec<usize>,
@@ -577,6 +584,18 @@ fn test_two_stack_queue() {
 ///   was obvious...?
 /// * With only two stacks all we can do is "pour" values from on stack to the other.
 /// * (I did some research and that assumption about needing a temp variable is correct)
+/// * Given that we can and should use a helper variable, the algorithm becomes pretty easy:
+///     * Designate a temporary stack as the "sorted" stack
+///     * Take a value off of the main stack
+///     * Save that value to a variable
+///     * Compare it to the top of the temp stack
+///     * If it is greater (or less, however we are sorting) pop the temp stack onto the main stack
+///     * Compare again and pop/push until the temp value is less (or greater, however we are
+///       sorting)
+///     * Pop values off of the main stack onto the temp stack as long as temp stack stays sorted.
+///
+/// Look at the docs for the `StackSort::sort()` method for more information about the
+/// implementation.
 ///
 pub struct StackSort {
     list: Vec<usize>,
@@ -637,6 +656,17 @@ impl StackSort {
     /// 2. Then we pop values off of `temp` (which should always be sorted) until we find where our
     ///    temp value should go.
     /// 3. Pop elements off of `list` onto `temp` until it stops being sorted.
+    ///
+    /// NOTE: This function is _long_. It could be shorter, by splitting out some functionality
+    /// into smaller methods, but I feel it wouldn't read as well. Of course when collaborating
+    /// with others on a codebase I follow the team's direction, but for this I figured "I can read
+    /// this cover to cover and it makes sense. Splitting this out into smaller methods would
+    /// obscure that legibility".
+    ///
+    /// Also note that this sorting algorithm is not computationally efficient. It is constantly
+    /// pushing and popping things from one stack to the other, but given the constraints of the
+    /// problem I think it's roughly as complex as it needs to be. As for space complexity, it uses
+    /// roughly constant space _total_ between both stacks and a few variables for bookkeeping.
     ///
     pub fn sort(&mut self) {
         // While !self.is_empty()
