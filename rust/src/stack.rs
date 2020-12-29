@@ -3,8 +3,8 @@
 /// Our goals with this exercise are...
 /// * Implement three stacks with one vec. [TriStack]
 /// * Design a stack which has Push, Pop, and Min, all of which operate in O(1). [ConstStack]
-/// * Implement a Queue using two Stacks.
-/// * Sort a stack using at most one additional stack.
+/// * Implement a Queue using two Stacks. [TwoStackQueue]
+/// * Sort a stack using at most one additional stack. [StackSort]
 ///
 /// NOTE: All of these implementations operate on `usize` elements.
 /// They could just as easily operate on an arbitrary T, but we operate on usize for simplicity.
@@ -556,4 +556,203 @@ fn test_two_stack_queue() {
     assert_eq!(q.pop(), Some(4));
     assert_eq!(q.pop(), Some(5));
     assert_eq!(q.pop(), None);
+}
+
+/// 
+/// SortStack
+///
+/// > Sort a stack using at most one additional stack.
+/// > The stacks support push, pop, peek, and isEmpty.
+///
+/// For this we are goig to implement a simple stack that wraps `Vec` and includes a `sort` method.
+/// That `sort` will be where all the interesting solution stuff happens, so we're going to focus
+/// on that part of our implementation.
+///
+/// Knowing nothing about sorting a stack with a second stack, I'm going to need to brainstorm a
+/// bit:
+///
+/// * We have two stacks (duh).
+/// * We can only compare the top of these two stacks.
+/// * I think we need at least one temporary variable, in addition to the two stacks -- maybe that
+///   was obvious...?
+/// * With only two stacks all we can do is "pour" values from on stack to the other.
+/// * (I did some research and that assumption about needing a temp variable is correct)
+///
+pub struct StackSort {
+    list: Vec<usize>,
+    temp: Vec<usize>,
+}
+
+impl StackSort {
+    pub fn new() -> StackSort {
+        StackSort {
+            list: Vec::new(),
+            temp: Vec::new(),
+        }
+    }
+
+    pub fn push(&mut self, val: usize) {
+        self.list.push(val);
+    }
+
+    fn push_temp(&mut self, val: usize) {
+        self.temp.push(val);
+    }
+
+    pub fn pop(&mut self) -> Option<usize> {
+        self.list.pop()
+    }
+
+    fn pop_temp(&mut self) -> Option<usize> {
+        self.temp.pop()
+    }
+
+    pub fn peek(&self) -> Option<usize> {
+        match self.list.last() {
+            Some(&v) => Some(v),
+            None => None,
+        }
+    }
+
+    fn peek_temp(&self) -> Option<usize> {
+        match self.temp.last() {
+            Some(&v) => Some(v),
+            None => None,
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.list.is_empty()
+    }
+
+    ///
+    /// The jist of our algorithm is that we have a `temp` stack that will be sorted in ascending
+    /// order (lower values on top).
+    ///
+    /// We also have our `list` which is our input and where we eventually dump our `temp` onto so
+    /// we have a finalized `sorted` list which is in descending (higher values on top) order.
+    ///
+    /// 1. We pop a value off of `list` into a temporary variable. This is what we are trying to
+    ///    sort.
+    /// 2. Then we pop values off of `temp` (which should always be sorted) until we find where our
+    ///    temp value should go.
+    /// 3. Pop elements off of `list` onto `temp` until it stops being sorted.
+    ///
+    pub fn sort(&mut self) {
+        // While !self.is_empty()
+        //     If self.peek() < self.temp.peek()
+        //         self.list.pop() -> self.temp.push(val)
+        //     Else
+        //         val = self.pop()
+        //         While val > self.temp.peek()
+        //             self.temp.pop() -> self.push()
+        //         self.temp.push(val)
+        //  Reverse self.temp into self.list
+        while !self.is_empty() {
+            // Determine if our stack has elements to sort, it should at this point
+            match self.peek() {
+                // The stack contains _something_ so we process that value
+                Some(top) => {
+                    // Compare the top of our stack with the top of our temp stack
+                    match self.peek_temp() {
+                        // The temp stack is already populated, so we do some comparisons
+                        // NOTE: the temp stack should _always_ be sorted
+                        Some(tmp) => {
+                            // We should be able to unwrap this safely as we aleady verified this
+                            // is a Some(value) not a None when we called `peek()`.
+                            let val = self.pop().unwrap();
+
+                            // If the top value on our stack is less than the temp stack's top, we
+                            // transfer the value from the stack to the temp stack
+                            if val < tmp {
+                                self.push_temp(val);
+                            // Our current value should not go onto the sorted stack, so we have to
+                            // do shuffling of bits
+                            } else {
+                                // First, pop values off of `temp` onto `list` until we find a spot
+                                // that our value fits, or we hit bedrock (an empty stack).
+                                while Some(val) >= self.peek_temp() {
+                                    match self.pop_temp() {
+                                        Some(t) => self.push(t),
+                                        None => break,
+                                    }
+                                }
+
+                                // Push our value onto the stack
+                                self.push_temp(val);
+
+                                // Now pop values off of `list` onto `temp` as long as temp stays
+                                // sorted (that's not the literal logic we use, but that's
+                                // effectively what we're doing here).
+                                while Some(val) <= self.peek() {
+                                    match self.pop() {
+                                        Some(t) => self.push_temp(t),
+                                        None => break,
+                                    }
+                                }
+                            }
+                        },
+                        // The temp stack is empty, so our `top` value must be the lowest value
+                        // we've seen this far
+                        None => {
+                            self.pop();
+                            self.push_temp(top);
+                        },
+                    }
+                },
+                // Our stack is empty, this should have ended the `while`, so this code path is
+                // probably never hit, but we cover this `match` case for correctness.
+                None => {
+                    break;
+                },
+            }
+        }
+
+        // Reverse the `temp` stack back onto `list` so we end up with a descending ordered stack
+        while let Some(val) = self.temp.pop() {
+            self.list.push(val);
+        }
+    }
+}
+
+#[test]
+fn test_stack_sort() {
+    let mut s = StackSort::new();
+
+    // Check our methods work with an empty stack
+    assert_eq!(s.is_empty(), true);
+    assert_eq!(s.peek(), None);
+    assert_eq!(s.pop(), None);
+
+    s.push(1);
+
+    // Check is_empty and peek work
+    assert_eq!(s.is_empty(), false);
+    assert_eq!(s.peek(), Some(1));
+
+    // Populate the stack with _unsorted_ elements
+    s.push(2);
+    s.push(6);
+    s.push(4);
+    s.push(3);
+    s.push(5);
+
+    // Double check the stack has not been tampered with
+    assert_eq!(s.peek(), Some(5));
+
+    // Make the call to sort the stack
+    s.sort();
+
+    // Double check the stack has been modified
+    assert_eq!(s.peek(), Some(6));
+
+    // Assert the list was sorted by popping all elements from the stack
+    // We exect it to be sorted in descending order
+    assert_eq!(s.pop(), Some(6));
+    assert_eq!(s.pop(), Some(5));
+    assert_eq!(s.pop(), Some(4));
+    assert_eq!(s.pop(), Some(3));
+    assert_eq!(s.pop(), Some(2));
+    assert_eq!(s.pop(), Some(1));
+    assert_eq!(s.pop(), None);
 }
