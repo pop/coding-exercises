@@ -6,6 +6,9 @@
 /// * Implement a Queue using two Stacks.
 /// * Sort a stack using at most one additional stack.
 ///
+/// NOTE: All of these implementations operate on `usize` elements.
+/// They could just as easily operate on an arbitrary T, but we operate on usize for simplicity.
+///
 
 ///
 /// TriStack
@@ -249,12 +252,12 @@ fn test_find_top_element() {
 /// Note that I was tempted to implement this with slices and arrays instead of Vecs.
 /// I was hoping to do that to (A) limit the helper methods I could use and (B) hopefully get some
 /// memory gains.
-/// This ended up being trickey and I gave up on it because of either ownership problems, which are
+/// This ended up being tricky and I gave up on it because of either ownership problems, which are
 /// manageable, and growing memory ownership problems, which I'm still not comfortable with. Plus
 /// by the time I got something working I lost all of the memory benefits of Vec (I assume) are in
 /// the stdlib.
 ///
-/// Here's the problem with usin slices instead of vecs.
+/// Here's the problem with using slices instead of vecs.
 ///
 /// Let's say we're in `push` and we want to add an element to our stack:
 ///
@@ -291,7 +294,7 @@ fn test_find_top_element() {
 /// cannot use Box<Slice> nor Box<&Slice> for this solution.
 ///
 /// Which leaves us with a few other options.
-/// We can either use a Vec, which is definitly the easy way out (it even has `push` and `pop`
+/// We can either use a Vec, which is definitely the easy way out (it even has `push` and `pop`
 /// built in) or we can use some other structure like a linked list.
 ///
 /// To make this exercise challenging we're doing our own bookkeeping for `min` value and `top`
@@ -312,6 +315,13 @@ fn test_find_top_element() {
 /// Stack](https://rust-unofficial.github.io/too-many-lists/first.html) from "Learn Rust With
 /// Entirely Too Many Linked Lists" -- which I only realized after getting half way through my
 /// implementation... 😅
+///
+/// NOTE: There are plenty of short-cuts I could have used for this exercise, namely using a
+/// LinkedList stdlib data type or a Vec, but I _chose_ to do this on harder mode to learn
+/// something about Rust. I'm still wading my way through Rust to get down to the deep memory
+/// management bits. The first step in mastering something like Rust is to avoid going the easy way
+/// out at every turn and start doing things the hard way; then when you come up for air you'll
+/// have much better mastery over the easy stuff. That's the plan at least...
 ///
 #[derive(Debug, Clone)]
 pub struct ConstStack {
@@ -337,7 +347,7 @@ impl<'a> ConstStack {
     ///
     pub fn push(&mut self, val: usize) {
         // Create copy of self and push that under self into linked list
-        // We do this before modifying the head of the stack becuase we are about to over-write our
+        // We do this before modifying the head of the stack because we are about to over-write our
         // self.* values.
         self.next = match self.val {
             Some(_) => {
@@ -350,7 +360,7 @@ impl<'a> ConstStack {
             None => None
         };
 
-        // Update self values to reflet the new stack state
+        // Update self values to reflect the new stack state
         self.min = match self.min {
             Some(cur) if cur > val => Some(val),
             None                   => Some(val),
@@ -423,4 +433,127 @@ fn test_const_stack() {
 ///
 /// > Implement a Queue using two Stacks.
 ///
-pub struct TwoStackQueue { }
+/// API Discussion:
+///
+/// We want a queue, first in first out, so we want an interface like this:
+///
+/// ```
+/// # use exercises::stack::TwoStackQueue;
+///
+/// let mut q = TwoStackQueue::new();
+///
+/// q.push(1);
+/// q.push(2);
+/// q.push(3);
+///
+/// assert_eq!(q.pop(), Some(1));
+/// assert_eq!(q.pop(), Some(2));
+/// assert_eq!(q.pop(), Some(3));
+/// assert_eq!(q.pop(), None);
+/// ```
+///
+/// Should be easy enough.
+///
+/// Implementation Discussion:
+///
+/// Using only two stacks, we could use one of the above stacks but let's not.
+/// We'll just use two Vecs and implement a Push and Pop method.
+///
+/// So how do we use two Stacks to create a queue? Let's brainstorm:
+///
+/// * Let's say we have two stacks (A) and (B).
+///
+/// * If we just store everything the user `push`-es onto the queue in (A).
+///   (A) has all user input, the question becomes how do we pop elements off a queue-fashion?
+///
+/// * When the user `pop`-s something off the queue we can reverse (A) onto (B), pop desired
+/// element off, and then un-reverse the stack onto the original stack.
+///
+/// * This is computationally inefficient, but the problem didn't specify any space of
+/// computational complexity restrictions, so it is a valid solution.
+///
+/// Here's some pseudocode for the above solution:
+///
+/// ```ignore
+/// fn push(&mut self, val: usize) {
+///     push val onto self.a_stack
+/// }
+///
+/// fn pop(&mut self) -> usize {
+///     reverse self.a_stack into self.b_stack
+///
+///     pop element off of self.b_stack
+///
+///     reverse self.b_stack onto self.a_stack
+///
+///     return popped element
+/// }
+/// ```
+///
+pub struct TwoStackQueue {
+    a: Vec<usize>,
+    b: Vec<usize>,
+}
+
+impl TwoStackQueue {
+    pub fn new() -> TwoStackQueue {
+        TwoStackQueue {
+            a: Vec::new(),
+            b: Vec::new(),
+        }
+    }
+
+    pub fn push(&mut self, val: usize) {
+        // Push is dead simple as we are leveraging `Vec`-s use as a stack.
+        self.a.push(val);
+    }
+
+    pub fn pop(&mut self) -> Option<usize> {
+        // Drain the A stack onto B
+        while let Some(element) = self.a.pop() {
+            self.b.push(element);
+        }
+
+        // Pop the first-in element from B
+        // We get the safety that our `pop` will always return `None` on an empty stack because Vec
+        // always returns None on an empty stack or Some for all other cases.
+        let ret = self.b.pop();
+
+        // Drain B back onto A, giving us almost the original stack
+        while let Some(element) = self.b.pop() {
+            self.a.push(element);
+        }
+
+        ret
+    }
+}
+
+#[test]
+fn test_two_stack_queue() {
+    let mut q = TwoStackQueue::new();
+
+    assert_eq!(q.pop(), None);
+
+    q.push(1);
+    q.push(2);
+    q.push(1);
+    q.push(3);
+    q.push(2);
+    q.push(3);
+
+    assert_eq!(q.pop(), Some(1));
+    assert_eq!(q.pop(), Some(2));
+    assert_eq!(q.pop(), Some(1));
+    assert_eq!(q.pop(), Some(3));
+    assert_eq!(q.pop(), Some(2));
+    assert_eq!(q.pop(), Some(3));
+    assert_eq!(q.pop(), None);
+    assert_eq!(q.pop(), None);
+
+    q.push(4);
+    q.push(5);
+
+    assert_eq!(q.pop(), Some(4));
+    assert_eq!(q.pop(), Some(5));
+    assert_eq!(q.pop(), None);
+}
